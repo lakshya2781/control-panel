@@ -11,9 +11,9 @@ def now_ist():
 
 # 👇 PASTE YOUR REAL URLS HERE
 services = [
-    {"name": "🔢 Counter Server", "url": "https://counter-server-xxxx.onrender.com"},
-    {"name": "📊 Population Tracker", "url": "https://population-server-xxxx.onrender.com"},
-    {"name": "📡 CPaaS Usage Monitor", "url": "https://cpaas-monitor-xxxx.onrender.com"},
+    {"name": "🔢 Counter Server", "url": "https://counter-project-nzk9.onrender.com/"},
+    {"name": "📊 Population Tracker", "url": "https://population-project.onrender.com/"},
+    {"name": "📡 CPaaS Usage Monitor", "url": "https://synthetic-call-sms-activity-simulator.onrender.com/"},
 ]
 
 def check_status(url):
