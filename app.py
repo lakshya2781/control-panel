@@ -13,9 +13,9 @@ def now_ist():
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 services = [
-    {"name": "🔢 Counter Server", "url": "https://counter-server-xxxx.onrender.com"},
-    {"name": "📊 Population Tracker", "url": "https://population-server-xxxx.onrender.com"},
-    {"name": "📡 CPaaS Usage Monitor", "url": "https://cpaas-monitor-xxxx.onrender.com"},
+    {"name": "🔢 Counter Server", "url": "https://counter-project-nzk9.onrender.com"},
+    {"name": "📊 Population Tracker", "url": "https://population-project.onrender.com/"},
+    {"name": "📡 CPaaS Usage Monitor", "url": "https://synthetic-call-sms-activity-simulator.onrender.com/"},
 ]
 
 def get_db():
