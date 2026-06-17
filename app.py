@@ -391,7 +391,6 @@ def dashboard():
             </tr>
             <tbody id="service-rows"></tbody>
         </table>
-        <p style="margin-top:15px"><a href="https://counter-project-nzk9.onrender.com/dbview" target="_blank" style="color:cyan">🗄️ View Database</a></p>
         <h3 style="margin-top:30px">📊 Live Data Snapshot</h3>
         <div id="data-panel">Loading...</div>
         <p style="color:#666; margin-top:30px">Data refreshes every 12 seconds. Background checks every 5 min via cron-job.org.</p>
@@ -432,6 +431,7 @@ def dashboard():
                         <div><p style="color:#aaa">Top Stock Gainer</p><h2 style="color:lime">${gainerHtml}</h2></div>
                         <div><p style="color:#aaa">Top Stock Loser</p><h2 style="color:#ff5050">${loserHtml}</h2></div>
                     </div>
+                    <p style="margin-top:15px"><a href="https://counter-project-nzk9.onrender.com/dbview" target="_blank" style="color:cyan">🗄️ View Database</a></p>
                     <p style="color:#666">Population last updated: ${data.population_last_updated} &nbsp;|&nbsp; Stocks last updated: ${data.stocks_last_updated}</p>
                 `;
             } catch (e) {
