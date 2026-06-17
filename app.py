@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 import requests
 import datetime, os
 from datetime import timezone, timedelta
@@ -340,50 +340,48 @@ def test_email():
         f"This is a test email sent at {now_ist()} IST to confirm the email pipeline works."
     )
     return "Test email attempt finished — check Render logs and your inbox", 200
-   
-@app.route("/")
-def dashboard():
-    rows = ""
+
+@app.route("/api/dashboard-data")
+def dashboard_data():
+    service_list = []
     service_statuses = {}
     for s in services:
         status_text, color = check_status(s["url"])
         service_statuses[s["name"]] = status_text
-        rows += f"""
-        <tr>
-            <td style="padding:12px">{s['name']}</td>
-            <td style="padding:12px; color:{color}">{status_text}</td>
-            <td style="padding:12px"><a href="{s['url']}" target="_blank" style="color:cyan">Open →</a></td>
-        </tr>"""
+        service_list.append({"name": s["name"], "url": s["url"], "status": status_text, "color": color})
 
     try:
         live = get_live_data()
-        top_states_html = "".join(f"<li>{name}: {pop:,}</li>" for name, pop in live["top_states"])
-
-        gainer = live.get("top_gainer")
-        loser = live.get("top_loser")
-        gainer_html = f"{gainer['symbol']} {gainer['change_pct']:+.2f}%" if gainer else "N/A"
-        loser_html = f"{loser['symbol']} {loser['change_pct']:+.2f}%" if loser else "N/A"
-
-        data_panel = f"""
-        <div style="display:flex; gap:50px; margin:25px 0; flex-wrap:wrap;">
-            <div><p style="color:#aaa">Counter Value</p><h2 style="color:lime">{live['counter_value']}</h2></div>
-            <div><p style="color:#aaa">Total CPaaS Calls</p><h2 style="color:yellow">{live['total_calls']:,}</h2></div>
-            <div><p style="color:#aaa">Total CPaaS SMS</p><h2 style="color:orange">{live['total_sms']:,}</h2></div>
-            <div><p style="color:#aaa">Top 3 States</p><ul style="color:cyan">{top_states_html}</ul></div>
-            <div><p style="color:#aaa">Top Stock Gainer</p><h2 style="color:lime">{gainer_html}</h2></div>
-            <div><p style="color:#aaa">Top Stock Loser</p><h2 style="color:#ff5050">{loser_html}</h2></div>
-        </div>
-        <p style="color:#666">Population last updated: {live['population_last_updated']} &nbsp;|&nbsp; Stocks last updated: {live['stocks_last_updated']}</p>
-        """
+        run_alert_checks(service_statuses, live)
+        top_states = [{"name": name, "population": pop} for name, pop in live["top_states"]]
+        return jsonify({
+            "checked_at": now_ist(),
+            "services": service_list,
+            "counter_value": live["counter_value"],
+            "total_calls": live["total_calls"],
+            "total_sms": live["total_sms"],
+            "top_states": top_states,
+            "population_last_updated": live["population_last_updated"],
+            "top_gainer": live.get("top_gainer"),
+            "top_loser": live.get("top_loser"),
+            "stocks_last_updated": live.get("stocks_last_updated"),
+            "error": None
+        })
     except Exception as e:
-        data_panel = f"<p style='color:red'>⚠️ Could not load live data: {e}</p>"
-
-    return f"""
+        return jsonify({
+            "checked_at": now_ist(),
+            "services": service_list,
+            "error": str(e)
+        })
+        
+@app.route("/")
+def dashboard():
+    return """
     <html>
-    <head><title>My Cloud Dashboard</title><meta http-equiv="refresh" content="30"></head>
+    <head><title>My Cloud Dashboard</title></head>
     <body style="font-family:monospace; background:#111; color:#0f0; padding:40px">
         <h1>🏠 My Cloud Dashboard</h1>
-        <p style="color:#aaa">Last checked (IST): {now_ist()}</p>
+        <p style="color:#aaa">Last checked (IST): <span id="last-checked">loading...</span></p>
         <h3>📡 Service Status</h3>
         <table style="border-collapse:collapse; width:100%; margin-top:10px">
             <tr style="border-bottom:1px solid #0f0">
@@ -391,11 +389,58 @@ def dashboard():
                 <th style="text-align:left; padding:12px">Status</th>
                 <th style="text-align:left; padding:12px">Link</th>
             </tr>
-            {rows}
+            <tbody id="service-rows"></tbody>
         </table>
+        <p style="margin-top:15px"><a href="https://counter-project-nzk9.onrender.com/dbview" target="_blank" style="color:cyan">🗄️ View Database</a></p>
         <h3 style="margin-top:30px">📊 Live Data Snapshot</h3>
-        {data_panel}
-        <p style="color:#666; margin-top:30px">Auto-refreshes every 30 seconds. Background checks every 5 min via cron-job.org.</p>
+        <div id="data-panel">Loading...</div>
+        <p style="color:#666; margin-top:30px">Data refreshes every 12 seconds. Background checks every 5 min via cron-job.org.</p>
+
+        <script>
+        async function refresh() {
+            try {
+                const res = await fetch('/api/dashboard-data');
+                const data = await res.json();
+
+                document.getElementById('last-checked').textContent = data.checked_at;
+
+                document.getElementById('service-rows').innerHTML = data.services.map(s => `
+                    <tr>
+                        <td style="padding:12px">${s.name}</td>
+                        <td style="padding:12px; color:${s.color}">${s.status}</td>
+                        <td style="padding:12px"><a href="${s.url}" target="_blank" style="color:cyan">Open →</a></td>
+                    </tr>`).join('');
+
+                if (data.error) {
+                    document.getElementById('data-panel').innerHTML =
+                        `<p style='color:red'>⚠️ Could not load live data: ${data.error}</p>`;
+                    return;
+                }
+
+                const topStatesHtml = data.top_states.map(s => `<li>${s.name}: ${s.population.toLocaleString()}</li>`).join('');
+                const gainer = data.top_gainer;
+                const loser = data.top_loser;
+                const gainerHtml = gainer ? `${gainer.symbol} ${gainer.change_pct >= 0 ? '+' : ''}${gainer.change_pct.toFixed(2)}%` : 'N/A';
+                const loserHtml = loser ? `${loser.symbol} ${loser.change_pct >= 0 ? '+' : ''}${loser.change_pct.toFixed(2)}%` : 'N/A';
+
+                document.getElementById('data-panel').innerHTML = `
+                    <div style="display:flex; gap:50px; margin:25px 0; flex-wrap:wrap;">
+                        <div><p style="color:#aaa">Counter Value</p><h2 style="color:lime">${data.counter_value}</h2></div>
+                        <div><p style="color:#aaa">Total CPaaS Calls</p><h2 style="color:yellow">${data.total_calls.toLocaleString()}</h2></div>
+                        <div><p style="color:#aaa">Total CPaaS SMS</p><h2 style="color:orange">${data.total_sms.toLocaleString()}</h2></div>
+                        <div><p style="color:#aaa">Top 3 States</p><ul style="color:cyan">${topStatesHtml}</ul></div>
+                        <div><p style="color:#aaa">Top Stock Gainer</p><h2 style="color:lime">${gainerHtml}</h2></div>
+                        <div><p style="color:#aaa">Top Stock Loser</p><h2 style="color:#ff5050">${loserHtml}</h2></div>
+                    </div>
+                    <p style="color:#666">Population last updated: ${data.population_last_updated} &nbsp;|&nbsp; Stocks last updated: ${data.stocks_last_updated}</p>
+                `;
+            } catch (e) {
+                console.error('Refresh failed:', e);
+            }
+        }
+        refresh();
+        setInterval(refresh, 12000);
+        </script>
     </body></html>"""
  
 if __name__ == "__main__":
