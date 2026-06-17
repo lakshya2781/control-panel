@@ -1,7 +1,6 @@
 from flask import Flask
 import requests
-import datetime, os, smtplib
-from email.mime.text import MIMEText
+import datetime, os
 from datetime import timezone, timedelta
 import psycopg2
 
@@ -118,20 +117,32 @@ def get_population_changes():
 # ---------------- EMAIL + STATUS HELPERS ----------------
 
 def send_alert_email(subject, body):
-    if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD or not ALERT_EMAIL_TO:
+    BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+    if not BREVO_API_KEY or not GMAIL_ADDRESS or not ALERT_EMAIL_TO:
         print("Email not configured, skipping alert", flush=True)
         return
+
+    url = "https://api.brevo.com/v3/smtp/email"
+    headers = {
+        "accept": "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json"
+    }
+    payload = {
+        "sender": {"name": "Control Panel Alerts", "email": GMAIL_ADDRESS},
+        "to": [{"email": ALERT_EMAIL_TO}],
+        "subject": subject,
+        "textContent": body
+    }
+
     try:
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = GMAIL_ADDRESS
-        msg["To"] = ALERT_EMAIL_TO
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-        print(f"Alert email sent: {subject}", flush=True)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code in (200, 201):
+            print(f"Alert email sent via Brevo: {subject}", flush=True)
+        else:
+            print(f"Brevo send failed: {response.status_code} - {response.text}", flush=True)
     except Exception as e:
-        print(f"Failed to send email: {e}", flush=True)
+        print(f"Failed to send email via Brevo: {e}", flush=True)
 
 def check_status(url):
     try:
