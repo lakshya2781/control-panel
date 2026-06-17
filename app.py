@@ -29,6 +29,8 @@ services = [
     {"name": "📈 Stock Monitor", "url": "https://stock-market-project-7kz6.onrender.com"},
 ]
 
+STOCK_API_URL = "https://stock-market-project-7kz6.onrender.com/api/snapshot"
+
 # In-memory tracker for service-down + population alerts (resets on restart — acceptable, low-frequency events)
 already_alerted = set()
 
@@ -98,6 +100,19 @@ def get_live_data():
 
     cur.close()
     conn.close()
+
+    # 📈 Stock Market snapshot — fetched over HTTP from the standalone stock service
+    try:
+        stock_resp = requests.get(STOCK_API_URL, timeout=5)
+        stock_json = stock_resp.json()
+        data["top_gainer"] = stock_json.get("top_gainer")
+        data["top_loser"] = stock_json.get("top_loser")
+        data["stocks_last_updated"] = stock_json.get("updated", "N/A")
+    except Exception:
+        data["top_gainer"] = None
+        data["top_loser"] = None
+        data["stocks_last_updated"] = "N/A"
+
     return data
 
 def get_population_changes():
@@ -248,14 +263,22 @@ def dashboard():
     try:
         live = get_live_data()
         top_states_html = "".join(f"<li>{name}: {pop:,}</li>" for name, pop in live["top_states"])
+
+        gainer = live.get("top_gainer")
+        loser = live.get("top_loser")
+        gainer_html = f"{gainer['symbol']} {gainer['change_pct']:+.2f}%" if gainer else "N/A"
+        loser_html = f"{loser['symbol']} {loser['change_pct']:+.2f}%" if loser else "N/A"
+
         data_panel = f"""
         <div style="display:flex; gap:50px; margin:25px 0; flex-wrap:wrap;">
             <div><p style="color:#aaa">Counter Value</p><h2 style="color:lime">{live['counter_value']}</h2></div>
             <div><p style="color:#aaa">Total CPaaS Calls</p><h2 style="color:yellow">{live['total_calls']:,}</h2></div>
             <div><p style="color:#aaa">Total CPaaS SMS</p><h2 style="color:orange">{live['total_sms']:,}</h2></div>
             <div><p style="color:#aaa">Top 3 States</p><ul style="color:cyan">{top_states_html}</ul></div>
+            <div><p style="color:#aaa">Top Stock Gainer</p><h2 style="color:lime">{gainer_html}</h2></div>
+            <div><p style="color:#aaa">Top Stock Loser</p><h2 style="color:#ff5050">{loser_html}</h2></div>
         </div>
-        <p style="color:#666">Population last updated: {live['population_last_updated']}</p>
+        <p style="color:#666">Population last updated: {live['population_last_updated']} &nbsp;|&nbsp; Stocks last updated: {live['stocks_last_updated']}</p>
         """
     except Exception as e:
         data_panel = f"<p style='color:red'>⚠️ Could not load live data: {e}</p>"
