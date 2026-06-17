@@ -222,6 +222,14 @@ def run_checks():
     except Exception as e:
         return f"Check failed: {e}", 500
 
+@app.route("/test-email")
+def test_email():
+    send_alert_email(
+        "✅ Test Email from Control Panel",
+        f"This is a test email sent at {now_ist()} IST to confirm the email pipeline works."
+    )
+    return "Test email attempt finished — check Render logs and your inbox", 200
+   
 @app.route("/")
 def dashboard():
     rows = ""
@@ -270,7 +278,7 @@ def dashboard():
         {data_panel}
         <p style="color:#666; margin-top:30px">Auto-refreshes every 30 seconds. Background checks every 5 min via cron-job.org.</p>
     </body></html>"""
-
+ 
 if __name__ == "__main__":
     init_alert_state_table()
     app.run(host="0.0.0.0", port=10000, threaded=True)
