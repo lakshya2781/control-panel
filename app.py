@@ -21,8 +21,8 @@ POPULATION_INCREASE_LIMIT = 450    # alert if any state rises by 450+ in one upd
 CALLS_MULTIPLE = 1000              # alert every time total calls crosses another 1000
 SMS_MULTIPLE = 4000                # alert every time total sms crosses another 4000
 STOCK_TICK_SPIKE_PCT = 3.0         # alert if any stock moves 3%+ in a single tick
-STOCK_DAY_CHANGE_LIMIT_PCT = 10.0  # alert if any stock's day change crosses ±10%
-STOCK_PRICE_MILESTONE = 100        # alert every time a stock price crosses another ₹100 mark
+STOCK_DAY_CHANGE_LIMIT_PCT = 50.0  # alert if any stock's day change crosses ±50%
+STOCK_PRICE_MILESTONE = 1000       # alert every time a stock price crosses another ₹1000 mark
 
 # 👇 EDIT THESE WITH YOUR REAL LIVE URLS
 services = [
@@ -306,13 +306,15 @@ def run_alert_checks(service_statuses, live_data):
                 already_alerted.add(day_alert_key)
 
             # Price milestone check (persisted per symbol)
+            stock_milestone = STOCK_PRICE_MILESTONE
             last_milestone = get_stock_price_milestone(symbol)
             current_milestone = int(price // STOCK_PRICE_MILESTONE)
             if current_milestone != last_milestone:
                 direction = "crossed above" if current_milestone > last_milestone else "dropped below"
                 send_alert_email(
                     f"💹 Incident: {symbol} {direction} ₹{current_milestone * STOCK_PRICE_MILESTONE:,}",
-                    f"Detected at {now_ist()} IST.\n\n{symbol} is now trading at ₹{price:,.2f}."
+                    f"Detected at {now_ist()} IST.\n\n{symbol} is now trading at ₹{price:,.2f},"
+                    f"a ₹{stock_milestone:+.2f} differ from today's open of ₹{open_price:,.2f}."
                 )
                 update_stock_price_milestone(symbol, current_milestone)
     except Exception as e:
