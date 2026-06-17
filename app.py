@@ -25,7 +25,8 @@ SMS_MULTIPLE = 4000                # alert every time total sms crosses another 
 services = [
     {"name": "🔢 Counter Server", "url": "https://counter-project-nzk9.onrender.com"},
     {"name": "📊 Population Tracker", "url": "https://population-project.onrender.com"},
-    {"name": "📡 CPaaS Usage Monitor", "url": "https://synthetic-call-sms-activity-simulator.onrender.com/"},
+    {"name": "📡 CPaaS Usage Monitor", "url": "https://synthetic-call-sms-activity-simulator.onrender.com"},
+    {"name": "📈 Stock Monitor", "url": "https://stock-market-project-7kz6.onrender.com"},
 ]
 
 # In-memory tracker for service-down + population alerts (resets on restart — acceptable, low-frequency events)
