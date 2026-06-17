@@ -20,6 +20,9 @@ POPULATION_DECREASE_LIMIT = -180   # alert if any state drops by 180+ in one upd
 POPULATION_INCREASE_LIMIT = 450    # alert if any state rises by 450+ in one update
 CALLS_MULTIPLE = 1000              # alert every time total calls crosses another 1000
 SMS_MULTIPLE = 4000                # alert every time total sms crosses another 4000
+STOCK_TICK_SPIKE_PCT = 3.0         # alert if any stock moves 3%+ in a single tick
+STOCK_DAY_CHANGE_LIMIT_PCT = 10.0  # alert if any stock's day change crosses ±10%
+STOCK_PRICE_MILESTONE = 100        # alert every time a stock price crosses another ₹100 mark
 
 # 👇 EDIT THESE WITH YOUR REAL LIVE URLS
 services = [
@@ -52,6 +55,14 @@ def init_alert_state_table():
     cur.execute("SELECT COUNT(*) FROM alert_state")
     if cur.fetchone()[0] == 0:
         cur.execute("INSERT INTO alert_state (id, last_calls_milestone, last_sms_milestone) VALUES (1, 0, 0)")
+
+    # 👇 ADD THIS — per-stock price milestone tracking
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS stock_alert_state (
+            symbol TEXT PRIMARY KEY,
+            last_price_milestone BIGINT NOT NULL DEFAULT 0
+        )
+    """)
     conn.commit()
     cur.close()
     conn.close()
@@ -65,6 +76,32 @@ def get_last_milestones():
     conn.close()
     return row[0], row[1]
 
+def get_stock_price_milestone(symbol):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT last_price_milestone FROM stock_alert_state WHERE symbol=%s", (symbol,))
+    row = cur.fetchone()
+    if row is None:
+        cur.execute("INSERT INTO stock_alert_state (symbol, last_price_milestone) VALUES (%s, 0)", (symbol,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return 0
+    cur.close()
+    conn.close()
+    return row[0]
+
+def update_stock_price_milestone(symbol, milestone):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE stock_alert_state SET last_price_milestone=%s WHERE symbol=%s",
+        (milestone, symbol)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    
 def update_last_milestones(calls_milestone, sms_milestone):
     conn = get_db()
     cur = conn.cursor()
@@ -130,6 +167,21 @@ def get_population_changes():
     conn.close()
     return rows
 
+def get_stock_history_changes():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT sh.symbol, sh.price, sh.change_amount, sh.log_time, ss.open_price
+        FROM stock_history sh
+        JOIN stock_state ss ON ss.symbol = sh.symbol
+        WHERE sh.id IN (
+            SELECT MAX(id) FROM stock_history GROUP BY symbol
+        )
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
 # ---------------- EMAIL + STATUS HELPERS ----------------
 
 def send_alert_email(subject, body):
@@ -222,6 +274,49 @@ def run_alert_checks(service_statuses, live_data):
         )
 
     update_last_milestones(current_calls_milestone, current_sms_milestone)
+
+    # --- Check 5: Stock tick spikes + day-change limits ---
+    try:
+        stock_rows = get_stock_history_changes()
+        for symbol, price, change_amount, log_time, open_price in stock_rows:
+            price = float(price); change_amount = float(change_amount); open_price = float(open_price)
+
+            # Per-tick spike check
+            tick_pct = (change_amount / (price - change_amount) * 100) if (price - change_amount) else 0
+            alert_key = f"tickspike_{symbol}_{log_time}"
+            if abs(tick_pct) >= STOCK_TICK_SPIKE_PCT and alert_key not in already_alerted:
+                direction = "jumped" if tick_pct > 0 else "dropped"
+                send_alert_email(
+                    f"⚡ Incident: {symbol} {direction} sharply in one tick",
+                    f"Detected at {now_ist()} IST.\n\n{symbol} moved {change_amount:+.2f} ({tick_pct:+.2f}%) "
+                    f"in a single tick (recorded at {log_time})."
+                )
+                already_alerted.add(alert_key)
+
+            # Day-change limit check
+            day_change_pct = ((price - open_price) / open_price * 100) if open_price else 0
+            day_alert_key = f"daychange_{symbol}_{log_time}"
+            if abs(day_change_pct) >= STOCK_DAY_CHANGE_LIMIT_PCT and day_alert_key not in already_alerted:
+                direction = "risen" if day_change_pct > 0 else "fallen"
+                send_alert_email(
+                    f"📉 Incident: {symbol} has {direction} {abs(day_change_pct):.2f}% today",
+                    f"Detected at {now_ist()} IST.\n\n{symbol} is now at ₹{price:,.2f}, "
+                    f"a {day_change_pct:+.2f}% change from today's open of ₹{open_price:,.2f}."
+                )
+                already_alerted.add(day_alert_key)
+
+            # Price milestone check (persisted per symbol)
+            last_milestone = get_stock_price_milestone(symbol)
+            current_milestone = int(price // STOCK_PRICE_MILESTONE)
+            if current_milestone != last_milestone:
+                direction = "crossed above" if current_milestone > last_milestone else "dropped below"
+                send_alert_email(
+                    f"💹 Incident: {symbol} {direction} ₹{current_milestone * STOCK_PRICE_MILESTONE:,}",
+                    f"Detected at {now_ist()} IST.\n\n{symbol} is now trading at ₹{price:,.2f}."
+                )
+                update_stock_price_milestone(symbol, current_milestone)
+    except Exception as e:
+        print(f"Stock check failed: {e}", flush=True)
 
 # ---------------- ROUTES ----------------
 
