@@ -21,7 +21,7 @@ POPULATION_INCREASE_LIMIT = 450    # alert if any state rises by 450+ in one upd
 CALLS_MULTIPLE = 1000              # alert every time total calls crosses another 1000
 SMS_MULTIPLE = 4000                # alert every time total sms crosses another 4000
 STOCK_TICK_SPIKE_PCT = 3.0         # alert if any stock moves 3%+ in a single tick
-STOCK_DAY_CHANGE_LIMIT_PCT = 50.0  # alert if any stock's day change crosses ±50%
+STOCK_DAY_CHANGE_LIMIT_PCT = 100.0  # alert if any stock's day change crosses 100%
 STOCK_PRICE_MILESTONE = 1000       # alert every time a stock price crosses another ₹1000 mark
 
 # 👇 EDIT THESE WITH YOUR REAL LIVE URLS
