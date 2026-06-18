@@ -63,6 +63,13 @@ def init_alert_state_table():
             last_price_milestone BIGINT NOT NULL DEFAULT 0
         )
     """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            message TEXT NOT NULL,
+            log_time TEXT NOT NULL
+        )
+    """)
     conn.commit()
     cur.close()
     conn.close()
@@ -113,6 +120,30 @@ def update_last_milestones(calls_milestone, sms_milestone):
     cur.close()
     conn.close()
 
+def add_notification(message):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO notifications (message, log_time) VALUES (%s, %s)",
+        (message, now_ist())
+    )
+    cur.execute("""
+        DELETE FROM notifications
+        WHERE id NOT IN (SELECT id FROM notifications ORDER BY id DESC LIMIT 10)
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+def get_recent_notifications():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT message FROM notifications ORDER BY id DESC LIMIT 10")
+    rows = [r[0] for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return rows
+    
 def get_live_data():
     conn = get_db()
     cur = conn.cursor()
@@ -227,10 +258,12 @@ def run_alert_checks(service_statuses, live_data):
         alert_key = f"down_{name}"
         if "Down" in status_text:
             if alert_key not in already_alerted:
+                subject = f"🔴 Incident: {name} is DOWN"
                 send_alert_email(
-                    f"🔴 Incident: {name} is DOWN",
+                    subject,
                     f"Detected at {now_ist()} IST.\n\nService '{name}' is not responding."
                 )
+                add_notification(subject)
                 already_alerted.add(alert_key)
         else:
             already_alerted.discard(alert_key)
@@ -243,11 +276,13 @@ def run_alert_checks(service_statuses, live_data):
             if change <= POPULATION_DECREASE_LIMIT or change >= POPULATION_INCREASE_LIMIT:
                 if alert_key not in already_alerted:
                     direction = "decreased" if change < 0 else "increased"
+                    subject = f"⚠️ Incident: {state_name} population {direction} sharply"
                     send_alert_email(
-                        f"⚠️ Incident: {state_name} population {direction} sharply",
+                        subject,
                         f"Detected at {now_ist()} IST.\n\n{state_name} population changed by {change:+} "
                         f"in the latest 5-minute update (recorded at {log_time})."
                     )
+                    add_notification(subject)
                     already_alerted.add(alert_key)
     except Exception as e:
         print(f"Population check failed: {e}", flush=True)
@@ -258,69 +293,73 @@ def run_alert_checks(service_statuses, live_data):
     total_calls = live_data["total_calls"]
     current_calls_milestone = total_calls // CALLS_MULTIPLE
     if current_calls_milestone > last_calls_milestone:
+        subject = "📞 Incident: Call milestone reached"
         send_alert_email(
-            "📞 Incident: Call milestone reached",
+            subject,
             f"Detected at {now_ist()} IST.\n\nTotal calls reached {total_calls:,} "
             f"(crossed the {current_calls_milestone * CALLS_MULTIPLE:,} mark)."
         )
+        add_notification(subject)
 
     total_sms = live_data["total_sms"]
     current_sms_milestone = total_sms // SMS_MULTIPLE
     if current_sms_milestone > last_sms_milestone:
+        subject = "💬 Incident: SMS milestone reached"
         send_alert_email(
-            "💬 Incident: SMS milestone reached",
+            subject,
             f"Detected at {now_ist()} IST.\n\nTotal SMS reached {total_sms:,} "
             f"(crossed the {current_sms_milestone * SMS_MULTIPLE:,} mark)."
         )
+        add_notification(subject)
 
     update_last_milestones(current_calls_milestone, current_sms_milestone)
 
-    # --- Check 5: Stock tick spikes + day-change limits ---
+    # --- Check 5: Stock tick spikes + day-change limits + price milestones ---
     try:
         stock_rows = get_stock_history_changes()
         for symbol, price, change_amount, log_time, open_price in stock_rows:
             price = float(price); change_amount = float(change_amount); open_price = float(open_price)
 
-            # Per-tick spike check
             tick_pct = (change_amount / (price - change_amount) * 100) if (price - change_amount) else 0
             alert_key = f"tickspike_{symbol}_{log_time}"
             if abs(tick_pct) >= STOCK_TICK_SPIKE_PCT and alert_key not in already_alerted:
                 direction = "jumped" if tick_pct > 0 else "dropped"
+                subject = f"⚡ Incident: {symbol} {direction} sharply in one tick"
                 send_alert_email(
-                    f"⚡ Incident: {symbol} {direction} sharply in one tick",
+                    subject,
                     f"Detected at {now_ist()} IST.\n\n{symbol} moved {change_amount:+.2f} ({tick_pct:+.2f}%) "
                     f"in a single tick (recorded at {log_time})."
                 )
+                add_notification(subject)
                 already_alerted.add(alert_key)
 
-            # Day-change limit check
             day_change_pct = ((price - open_price) / open_price * 100) if open_price else 0
             day_alert_key = f"daychange_{symbol}_{log_time}"
             if abs(day_change_pct) >= STOCK_DAY_CHANGE_LIMIT_PCT and day_alert_key not in already_alerted:
                 direction = "risen" if day_change_pct > 0 else "fallen"
+                subject = f"📉 Incident: {symbol} has {direction} {abs(day_change_pct):.2f}% today"
                 send_alert_email(
-                    f"📉 Incident: {symbol} has {direction} {abs(day_change_pct):.2f}% today",
+                    subject,
                     f"Detected at {now_ist()} IST.\n\n{symbol} is now at ₹{price:,.2f}, "
                     f"a {day_change_pct:+.2f}% change from today's open of ₹{open_price:,.2f}."
                 )
+                add_notification(subject)
                 already_alerted.add(day_alert_key)
 
-            # Price milestone check (persisted per symbol)
-            open_price = float(open_price)
-            stock_milestone = STOCK_PRICE_MILESTONE
             last_milestone = get_stock_price_milestone(symbol)
             current_milestone = int(price // STOCK_PRICE_MILESTONE)
             if current_milestone != last_milestone:
                 direction = "crossed above" if current_milestone > last_milestone else "dropped below"
+                subject = f"💹 Incident: {symbol} {direction} ₹{current_milestone * STOCK_PRICE_MILESTONE:,}"
                 send_alert_email(
-                    f"💹 Incident: {symbol} {direction} ₹{current_milestone * STOCK_PRICE_MILESTONE:,}",
-                    f"Detected at {now_ist()} IST.\n\n{symbol} is now trading at ₹{price:,.2f},"
-                    f"a ₹{stock_milestone:,.2f} differ from today's open of ₹{open_price:,.2f}."
+                    subject,
+                    f"Detected at {now_ist()} IST.\n\n{symbol} is now trading at ₹{price:,.2f}."
                 )
+                add_notification(subject)
                 update_stock_price_milestone(symbol, current_milestone)
     except Exception as e:
         print(f"Stock check failed: {e}", flush=True)
-
+        
 # ---------------- ROUTES ----------------
 
 @app.route("/run-checks")
@@ -353,6 +392,8 @@ def dashboard_data():
         service_statuses[s["name"]] = status_text
         service_list.append({"name": s["name"], "url": s["url"], "status": status_text, "color": color})
 
+    notifications = get_recent_notifications()
+
     try:
         live = get_live_data()
         run_alert_checks(service_statuses, live)
@@ -368,12 +409,14 @@ def dashboard_data():
             "top_gainer": live.get("top_gainer"),
             "top_loser": live.get("top_loser"),
             "stocks_last_updated": live.get("stocks_last_updated"),
+            "notifications": get_recent_notifications(),
             "error": None
         })
     except Exception as e:
         return jsonify({
             "checked_at": now_ist(),
             "services": service_list,
+            "notifications": notifications,
             "error": str(e)
         })
         
@@ -398,6 +441,13 @@ def dashboard():
         <div id="data-panel">Loading...</div>
         <p style="color:#666; margin-top:30px">Data refreshes every 12 seconds. Background checks every 5 min via cron-job.org.</p>
 
+        <div id="notif-box" style="position:fixed; bottom:20px; right:20px; width:320px; max-height:300px;
+            overflow-y:auto; background:#161616; border:1px solid #2a2a2a; border-radius:8px;
+            padding:14px; box-shadow:0 4px 12px rgba(0,0,0,0.5); font-size:12px;">
+            <div style="color:#ccc; font-weight:bold; margin-bottom:8px;">🔔 Recent Alerts</div>
+            <ul id="notif-list" style="margin:0; padding-left:18px; color:#aaa; list-style:disc;"></ul>
+        </div>
+
         <script>
         async function refresh() {
             try {
@@ -412,6 +462,13 @@ def dashboard():
                         <td style="padding:12px; color:${s.color}">${s.status}</td>
                         <td style="padding:12px"><a href="${s.url}" target="_blank" style="color:cyan">Open →</a></td>
                     </tr>`).join('');
+
+                const notifList = document.getElementById('notif-list');
+                if (data.notifications && data.notifications.length > 0) {
+                    notifList.innerHTML = data.notifications.map(n => `<li style="margin-bottom:6px;">${n}</li>`).join('');
+                } else {
+                    notifList.innerHTML = '<li style="list-style:none; margin-left:-18px; color:#555;">No alerts yet</li>';
+                }
 
                 if (data.error) {
                     document.getElementById('data-panel').innerHTML =
