@@ -138,8 +138,8 @@ def add_notification(message):
 def get_recent_notifications():
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT message FROM notifications ORDER BY id DESC LIMIT 10")
-    rows = [r[0] for r in cur.fetchall()]
+    cur.execute("SELECT message, log_time FROM notifications ORDER BY id DESC LIMIT 10")
+    rows = [{"message": r[0], "time": r[1]} for r in cur.fetchall()]
     cur.close()
     conn.close()
     return rows
@@ -465,7 +465,10 @@ def dashboard():
 
                 const notifList = document.getElementById('notif-list');
                 if (data.notifications && data.notifications.length > 0) {
-                    notifList.innerHTML = data.notifications.map(n => `<li style="margin-bottom:6px;">${n}</li>`).join('');
+                    notifList.innerHTML = data.notifications.map(n => `
+                        <li style="margin-bottom:6px;">
+                            ${n.message}<br><span style="color:#666; font-size:11px;">${n.time}</span>
+                        </li>`).join('');
                 } else {
                     notifList.innerHTML = '<li style="list-style:none; margin-left:-18px; color:#555;">No alerts yet</li>';
                 }
