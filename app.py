@@ -306,6 +306,7 @@ def run_alert_checks(service_statuses, live_data):
                 already_alerted.add(day_alert_key)
 
             # Price milestone check (persisted per symbol)
+            open_price = float(open_price)
             stock_milestone = STOCK_PRICE_MILESTONE
             last_milestone = get_stock_price_milestone(symbol)
             current_milestone = int(price // STOCK_PRICE_MILESTONE)
@@ -314,7 +315,7 @@ def run_alert_checks(service_statuses, live_data):
                 send_alert_email(
                     f"💹 Incident: {symbol} {direction} ₹{current_milestone * STOCK_PRICE_MILESTONE:,}",
                     f"Detected at {now_ist()} IST.\n\n{symbol} is now trading at ₹{price:,.2f},"
-                    f"a ₹{stock_milestone:+.2f} differ from today's open of ₹{open_price:,.2f}."
+                    f"a ₹{stock_milestone:,.2f} differ from today's open of ₹{open_price:,.2f}."
                 )
                 update_stock_price_milestone(symbol, current_milestone)
     except Exception as e:
