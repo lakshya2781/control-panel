@@ -396,7 +396,7 @@ def dashboard_data():
 
     try:
         live = get_live_data()
-        # run_alert_checks(service_statuses, live)
+        run_alert_checks(service_statuses, live)
         top_states = [{"name": name, "population": pop} for name, pop in live["top_states"]]
         return jsonify({
             "checked_at": now_ist(),
