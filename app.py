@@ -5,7 +5,7 @@ from datetime import timezone, timedelta
 import psycopg2
 
 app = Flask(__name__)
-
+ 
 IST = timezone(timedelta(hours=5, minutes=30))
 def now_ist():
     return datetime.datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
