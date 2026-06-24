@@ -21,7 +21,7 @@ POPULATION_INCREASE_LIMIT = 450    # alert if any state rises by 450+ in one upd
 CALLS_MULTIPLE = 1000              # alert every time total calls crosses another 1000
 SMS_MULTIPLE = 4000                # alert every time total sms crosses another 4000
 STOCK_TICK_SPIKE_PCT = 3.0         # alert if any stock moves 3%+ in a single tick
-STOCK_DAY_CHANGE_LIMIT_PCT = 200.0 # alert if any stock's day change crosses 200%
+# STOCK_DAY_CHANGE_LIMIT_PCT = 200.0 # alert if any stock's day change crosses 200%
 STOCK_PRICE_MILESTONE = 2000       # alert every time a stock price crosses another ₹2000 mark
 
 # 👇 EDIT THESE WITH YOUR REAL LIVE URLS
@@ -332,7 +332,7 @@ def run_alert_checks(service_statuses, live_data):
                 )
                 add_notification(subject)
                 already_alerted.add(alert_key)
-
+"""
             day_change_pct = ((price - open_price) / open_price * 100) if open_price else 0
             day_alert_key = f"daychange_{symbol}_{log_time}"
             if abs(day_change_pct) >= STOCK_DAY_CHANGE_LIMIT_PCT and day_alert_key not in already_alerted:
@@ -345,7 +345,7 @@ def run_alert_checks(service_statuses, live_data):
                 )
                 add_notification(subject)
                 already_alerted.add(day_alert_key)
-
+"""
             last_milestone = get_stock_price_milestone(symbol)
             current_milestone = int(price // STOCK_PRICE_MILESTONE)
             if current_milestone != last_milestone:
