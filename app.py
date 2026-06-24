@@ -332,20 +332,20 @@ def run_alert_checks(service_statuses, live_data):
                 )
                 add_notification(subject)
                 already_alerted.add(alert_key)
-"""
-            day_change_pct = ((price - open_price) / open_price * 100) if open_price else 0
-            day_alert_key = f"daychange_{symbol}_{log_time}"
-            if abs(day_change_pct) >= STOCK_DAY_CHANGE_LIMIT_PCT and day_alert_key not in already_alerted:
-                direction = "risen" if day_change_pct > 0 else "fallen"
-                subject = f"📉 Incident: {symbol} has {direction} {abs(day_change_pct):.2f}% today"
-                send_alert_email(
-                    subject,
-                    f"Detected at {now_ist()} IST.\n\n{symbol} is now at ₹{price:,.2f}, "
-                    f"a {day_change_pct:+.2f}% change from today's open of ₹{open_price:,.2f}."
-                )
-                add_notification(subject)
-                already_alerted.add(day_alert_key)
-"""
+             
+          #  day_change_pct = ((price - open_price) / open_price * 100) if open_price else 0
+          #  day_alert_key = f"daychange_{symbol}_{log_time}"
+          #  if abs(day_change_pct) >= STOCK_DAY_CHANGE_LIMIT_PCT and day_alert_key not in already_alerted:
+          #      direction = "risen" if day_change_pct > 0 else "fallen"
+          #      subject = f"📉 Incident: {symbol} has {direction} {abs(day_change_pct):.2f}% today"
+          #      send_alert_email(
+          #          subject,
+          #          f"Detected at {now_ist()} IST.\n\n{symbol} is now at ₹{price:,.2f}, "
+          #          f"a {day_change_pct:+.2f}% change from today's open of ₹{open_price:,.2f}."
+          #      )
+          #      add_notification(subject)
+          #      already_alerted.add(day_alert_key)
+
             last_milestone = get_stock_price_milestone(symbol)
             current_milestone = int(price // STOCK_PRICE_MILESTONE)
             if current_milestone != last_milestone:
