@@ -518,6 +518,26 @@ def dashboard():
                 const gainerHtml = gainer ? `${gainer.symbol} ${gainer.change_pct >= 0 ? '+' : ''}${gainer.change_pct.toFixed(2)}%` : 'N/A';
                 const loserHtml = loser ? `${loser.symbol} ${loser.change_pct >= 0 ? '+' : ''}${loser.change_pct.toFixed(2)}%` : 'N/A';
 
+                const tel = data.telecom_summary;
+
+const telHtml = tel
+    ? `
+        <div>
+            <p style="color:#aaa">Telecom Critical</p>
+            <h2 style="color:#ff3333">${tel.critical_events}</h2>
+        </div>
+        <div>
+            <p style="color:#aaa">Telecom Warnings</p>
+            <h2 style="color:#ffaa00">${tel.warning_events}</h2>
+        </div>
+      `
+    : `
+        <div>
+            <p style="color:#aaa">Telecom</p>
+            <h2 style="color:#555">N/A</h2>
+        </div>
+      `;
+      
                 document.getElementById('data-panel').innerHTML = `
                     <div style="display:flex; gap:50px; margin:25px 0; flex-wrap:wrap;">
                         <div><p style="color:#aaa">Counter Value</p><h2 style="color:lime">${data.counter_value}</h2></div>
@@ -526,13 +546,7 @@ def dashboard():
                         <div><p style="color:#aaa">Top 3 States</p><ul style="color:cyan">${topStatesHtml}</ul></div>
                         <div><p style="color:#aaa">Top Stock Gainer</p><h2 style="color:lime">${gainerHtml}</h2></div>
                         <div><p style="color:#aaa">Top Stock Loser</p><h2 style="color:#ff5050">${loserHtml}</h2></div>
-
-const tel = data.telecom_summary;
-const telHtml = tel
-    ? `<div><p style="color:#aaa">Telecom Critical</p><h2 style="color:#ff3333">${tel.critical_events}</h2></div>
-       <div><p style="color:#aaa">Telecom Warnings</p><h2 style="color:#ffaa00">${tel.warning_events}</h2></div>`
-    : `<div><p style="color:#aaa">Telecom</p><h2 style="color:#555">N/A</h2></div>`;
-                        
+                        ${telHtml}
                     </div>
                     <p style="margin-top:15px"><a href="https://counter-project-nzk9.onrender.com/dbview" target="_blank" style="color:cyan">🗄️ View Database</a></p>
                     <p style="color:#666">Population last updated: ${data.population_last_updated} &nbsp;|&nbsp; Stocks last updated: ${data.stocks_last_updated}</p>
