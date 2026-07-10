@@ -581,19 +581,29 @@ def dbview():
     cur = conn.cursor()
     sections = []
 
-    table_list = ["counter_state", "counter_logs", "population_state",
-                  "population_history", "cpaas_totals", "cpaas_minute_stats",
-                  "stock_state", "stock_history", "telecom_traffic", "telecom_dlr", 
-                  "telecom_security", "telecom_baselines"]
-
+    table_list = [
+    "counter_state", "counter_logs",
+    "population_state", "population_history",
+    "cpaas_totals", "cpaas_minute_stats",
+    "stock_state", "stock_history",
+    "telecom_traffic", "telecom_dlr",
+    "telecom_security", "telecom_baselines"
+]
+    
     for table_name in table_list:
         if table_filter != "all" and table_filter != table_name:
             continue
 
-        has_log_time = table_name in ("counter_logs", "population_history",
-                               "cpaas_minute_stats", "stock_history",
-                               "telecom_traffic", "telecom_dlr", "telecom_security")
-
+        has_log_time = table_name in (
+        "counter_logs",
+        "population_history",
+        "cpaas_minute_stats",
+        "stock_history",
+        "telecom_traffic",
+        "telecom_dlr",
+        "telecom_security"
+    )
+        
         if has_log_time:
             query = f"SELECT * FROM {table_name} WHERE 1=1"
             params = []
