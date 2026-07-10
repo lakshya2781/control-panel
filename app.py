@@ -26,6 +26,7 @@ STOCK_PRICE_MILESTONE = 2000       # alert every time a stock price crosses anot
 
 # 👇 EDIT THESE WITH YOUR REAL LIVE URLS
 services = [
+    {"name": "📡 Telecom Observability", "url": "https://telecom-observability.onrender.com"},
     {"name": "🔢 Counter Server", "url": "https://counter-project-nzk9.onrender.com"},
     {"name": "📊 Population Tracker", "url": "https://population-project.onrender.com"},
     {"name": "📡 CPaaS Usage Monitor", "url": "https://synthetic-call-sms-activity-simulator.onrender.com"},
@@ -33,6 +34,7 @@ services = [
 ]
 
 STOCK_API_URL = "https://stock-market-project-7kz6.onrender.com/api/snapshot"
+TELECOM_API_URL = "https://telecom-observability.onrender.com/api/snapshot"
 
 # In-memory tracker for service-down + population alerts (resets on restart — acceptable, low-frequency events)
 already_alerted = set()
@@ -169,6 +171,16 @@ def get_live_data():
     cur.close()
     conn.close()
 
+    # 📡 Telecom snapshot
+    try:
+        tel_resp = requests.get(TELECOM_API_URL, timeout=5)
+        tel_json = tel_resp.json()
+        data["telecom_summary"] = tel_json.get("summary")
+        data["telecom_security"] = tel_json.get("security_events", [])[:3]
+    except Exception:
+        data["telecom_summary"] = None
+        data["telecom_security"] = []
+    
     # 📈 Stock Market snapshot — fetched over HTTP from the standalone stock service
     try:
         stock_resp = requests.get(STOCK_API_URL, timeout=5)
@@ -359,6 +371,25 @@ def run_alert_checks(service_statuses, live_data):
                 update_stock_price_milestone(symbol, current_milestone)
     except Exception as e:
         print(f"Stock check failed: {e}", flush=True)
+
+# --- Check 6: Telecom anomalies ---
+    try:
+        tel_resp = requests.get(TELECOM_API_URL, timeout=5)
+        tel_json = tel_resp.json()
+        for event in tel_json.get("security_events", []):
+            alert_key = f"telecom_{event['source']}_{event['event_type']}_{event['time']}"
+            if alert_key not in already_alerted:
+                subject = f"{'🔴' if event['severity'] == 'critical' else '⚡'} Telecom {event['severity'].upper()}: {event['event_type']}"
+                send_alert_email(subject,
+                    f"Detected at {now_ist()} IST.\n\n"
+                    f"Source: {event['source'].upper()}\n"
+                    f"Event: {event['event_type']}\n"
+                    f"Detail: {event['detail']}"
+                )
+                add_notification(subject)
+                already_alerted.add(alert_key)
+    except Exception as e:
+        print(f"Telecom check failed: {e}", flush=True)
         
 # ---------------- ROUTES ----------------
 
@@ -410,6 +441,8 @@ def dashboard_data():
             "top_loser": live.get("top_loser"),
             "stocks_last_updated": live.get("stocks_last_updated"),
             "notifications": get_recent_notifications(),
+            "telecom_summary": live.get("telecom_summary"),
+            "telecom_security": live.get("telecom_security", []),
             "error": None
         })
     except Exception as e:
@@ -493,6 +526,13 @@ def dashboard():
                         <div><p style="color:#aaa">Top 3 States</p><ul style="color:cyan">${topStatesHtml}</ul></div>
                         <div><p style="color:#aaa">Top Stock Gainer</p><h2 style="color:lime">${gainerHtml}</h2></div>
                         <div><p style="color:#aaa">Top Stock Loser</p><h2 style="color:#ff5050">${loserHtml}</h2></div>
+
+const tel = data.telecom_summary;
+const telHtml = tel
+    ? `<div><p style="color:#aaa">Telecom Critical</p><h2 style="color:#ff3333">${tel.critical_events}</h2></div>
+       <div><p style="color:#aaa">Telecom Warnings</p><h2 style="color:#ffaa00">${tel.warning_events}</h2></div>`
+    : `<div><p style="color:#aaa">Telecom</p><h2 style="color:#555">N/A</h2></div>`;
+                        
                     </div>
                     <p style="margin-top:15px"><a href="https://counter-project-nzk9.onrender.com/dbview" target="_blank" style="color:cyan">🗄️ View Database</a></p>
                     <p style="color:#666">Population last updated: ${data.population_last_updated} &nbsp;|&nbsp; Stocks last updated: ${data.stocks_last_updated}</p>
@@ -505,7 +545,149 @@ def dashboard():
         setInterval(refresh, 12000);
         </script>
     </body></html>"""
- 
+
+@app.route("/dbview")
+def dbview():
+    provided_password = request.args.get("password", "")
+    if provided_password != DBVIEW_PASSWORD:
+        return """
+        <html>
+        <head><title>Locked</title></head>
+        <body style="font-family:monospace; background:#111; color:#0f0; padding:60px; text-align:center;">
+            <h2>🔒 Access Restricted</h2>
+            <p>Add ?password=YOUR_PASSWORD to the URL to view this page.</p>
+        </body></html>
+        """, 401
+
+    # --- Read filter parameters from URL ---
+    search_text = request.args.get("search", "").strip()
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+    table_filter = request.args.get("table", "all")
+    row_limit_raw = request.args.get("limit", "200").strip()
+
+    # Validate row limit
+    if row_limit_raw == "all":
+        row_limit = None
+    else:
+        try:
+            row_limit = int(row_limit_raw)
+            if row_limit <= 0:
+                row_limit = 200
+        except ValueError:
+            row_limit = 200
+
+    conn = get_db()
+    cur = conn.cursor()
+    sections = []
+
+    table_list = ["counter_state", "counter_logs", "population_state",
+                  "population_history", "cpaas_totals", "cpaas_minute_stats",
+                  "stock_state", "stock_history", "telecom_traffic", "telecom_dlr", 
+                  "telecom_security", "telecom_baselines"]
+
+    for table_name in table_list:
+        if table_filter != "all" and table_filter != table_name:
+            continue
+
+        has_log_time = table_name in ("counter_logs", "population_history",
+                               "cpaas_minute_stats", "stock_history",
+                               "telecom_traffic", "telecom_dlr", "telecom_security")
+
+        if has_log_time:
+            query = f"SELECT * FROM {table_name} WHERE 1=1"
+            params = []
+            if date_from:
+                query += " AND log_time >= %s"
+                params.append(date_from)
+            if date_to:
+                query += " AND log_time <= %s"
+                params.append(date_to + " 23:59:59")
+            if search_text:
+                query += " AND log_time::text ILIKE %s"
+                params.append(f"%{search_text}%")
+            query += " ORDER BY id DESC"
+            if row_limit is not None:
+                query += " LIMIT %s"
+                params.append(row_limit)
+            cur.execute(query, params)
+        else:
+            cur.execute(f"SELECT * FROM {table_name} ORDER BY 1")
+
+        cols = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+        sections.append((table_name, cols, rows))
+
+    cur.close()
+    conn.close()
+
+    # --- Build filter form ---
+    table_options = "".join(
+        f'<option value="{t}" {"selected" if table_filter==t else ""}>{t}</option>'
+        for t in table_list
+    )
+
+    limit_options_list = ["20", "50", "200", "500", "1000", "all"]
+    limit_options = "".join(
+        f'<option value="{l}" {"selected" if row_limit_raw==l else ""}>{"All" if l=="all" else l}</option>'
+        for l in limit_options_list
+    )
+
+    filter_html = f"""
+    <form method="GET" style="margin-bottom:25px; background:#1a1a1a; padding:15px; border-radius:6px;">
+        <input type="hidden" name="password" value="{provided_password}">
+        <label>Table:
+            <select name="table">
+                <option value="all" {"selected" if table_filter=="all" else ""}>All Tables</option>
+                {table_options}
+            </select>
+        </label>
+        &nbsp;&nbsp;
+        <label>Show:
+            <select name="limit">{limit_options}</select> rows
+        </label>
+        &nbsp;&nbsp;
+        <label>Search (timestamp text): <input type="text" name="search" value="{search_text}" placeholder="e.g. 2026-06-17"></label>
+        &nbsp;&nbsp;
+        <label>From: <input type="date" name="date_from" value="{date_from}"></label>
+        &nbsp;&nbsp;
+        <label>To: <input type="date" name="date_to" value="{date_to}"></label>
+        &nbsp;&nbsp;
+        <button type="submit" style="background:#0a5;color:white;border:none;padding:6px 14px;cursor:pointer;border-radius:4px;">Apply Filters</button>
+        <a href="/dbview?password={provided_password}" style="color:cyan; margin-left:10px;">Clear Filters</a>
+    </form>
+    """
+
+    html = f"""
+    <html>
+    <head>
+        <title>Database Viewer</title>
+        <style>
+            body {{ font-family:monospace; background:#111; color:#0f0; padding:30px; }}
+            h3 {{ color:cyan; margin-top:30px; }}
+            table {{ border-collapse:collapse; width:100%; margin-bottom:10px; }}
+            td, th {{ padding:6px 10px; text-align:left; border-bottom:1px solid #333; font-size:13px; }}
+            th {{ color:yellow; }}
+            input, select {{ background:#222; color:#0f0; border:1px solid #444; padding:4px; }}
+            label {{ color:#aaa; }}
+        </style>
+    </head>
+    <body>
+        <h2>🗄️ Database Viewer (Read-Only)</h2>
+        <p style="color:#aaa">Showing tables from shared-logs-db</p>
+        {filter_html}
+    """
+
+    for table_name, cols, rows in sections:
+        html += f"<h3>📋 {table_name} ({len(rows)} rows shown)</h3>"
+        html += "<table><tr>" + "".join(f"<th>{c}</th>" for c in cols) + "</tr>"
+        for row in rows:
+            html += "<tr>" + "".join(f"<td>{val}</td>" for val in row) + "</tr>"
+        html += "</table>"
+
+    html += "</body></html>"
+    return html
+    
 if __name__ == "__main__":
     init_alert_state_table()
     app.run(host="0.0.0.0", port=10000, threaded=True)
