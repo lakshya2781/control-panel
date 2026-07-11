@@ -452,6 +452,16 @@ def dashboard_data():
             "error": str(e)
         })
         
+@app.route("/fix-notifications")
+def fix_notifications():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM notifications")
+    conn.commit()
+    cur.close()
+    conn.close()
+    return "Notifications cleared", 200
+ 
 @app.route("/")
 def dashboard():
     return """
@@ -473,11 +483,11 @@ def dashboard():
         <div id="data-panel">Loading...</div>
         <p style="color:#666; margin-top:30px">Data refreshes every 12 seconds. Background checks every 5 min via cron-job.org.</p>
 
-        <div id="notif-box" style="position:fixed; bottom:20px; right:20px; width:320px; max-height:300px;
-            overflow-y:auto; background:#161616; border:1px solid #2a2a2a; border-radius:8px;
-            padding:14px; box-shadow:0 4px 12px rgba(0,0,0,0.5); font-size:12px;">
-            <div style="color:#ccc; font-weight:bold; margin-bottom:8px;">🔔 Recent Alerts</div>
-            <ul id="notif-list" style="margin:0; padding-left:18px; color:#aaa; list-style:disc;"></ul>
+        <div id="notif-box" style="position:fixed; bottom:16px; right:16px; width:240px; max-height:200px;
+            overflow-y:auto; background:#0f0f0f; border:1px solid #1e1e1e; border-radius:6px;
+            padding:10px 12px; box-shadow:0 2px 8px rgba(0,0,0,0.5); font-size:11px; z-index:100;">
+            <div style="color:#888; font-weight:bold; margin-bottom:6px; font-size:11px;">🔔 Recent Alerts</div>
+            <ul id="notif-list" style="margin:0; padding-left:14px; color:#777; list-style:disc;"></ul>
         </div>
 
         <script>
@@ -498,8 +508,8 @@ def dashboard():
                 const notifList = document.getElementById('notif-list');
                 if (data.notifications && data.notifications.length > 0) {
                     notifList.innerHTML = data.notifications.map(n => `
-                        <li style="margin-bottom:6px;">
-                            ${n.message}<br><span style="color:#666; font-size:11px;">${n.time}</span>
+                        <li style="margin-bottom:4px; font-size:10px; line-height:1.3;">
+                            ${n.message}<br><span style="color:#555; font-size:9px;">${n.time}</span>
                         </li>`).join('');
                 } else {
                     notifList.innerHTML = '<li style="list-style:none; margin-left:-18px; color:#555;">No alerts yet</li>';
