@@ -26,7 +26,7 @@ STOCK_PRICE_MILESTONE = 2000       # alert every time a stock price crosses anot
 
 # 👇 EDIT THESE WITH YOUR REAL LIVE URLS
 services = [
-    {"name": "📡 Telecom Observability", "url": "https://telecom-observability.onrender.com"},
+    {"name": "📡 Telecom Observability", "url": "https://telecom-observer.onrender.com"},
     {"name": "🔢 Counter Server", "url": "https://counter-project-nzk9.onrender.com"},
     {"name": "📊 Population Tracker", "url": "https://population-project.onrender.com"},
     {"name": "📡 CPaaS Usage Monitor", "url": "https://synthetic-call-sms-activity-simulator.onrender.com"},
@@ -34,7 +34,7 @@ services = [
 ]
 
 STOCK_API_URL = "https://stock-market-project-7kz6.onrender.com/api/snapshot"
-TELECOM_API_URL = "https://telecom-observability.onrender.com/api/snapshot"
+TELECOM_API_URL = "https://telecom-observer.onrender.com/api/snapshot"
 
 # In-memory tracker for service-down + population alerts (resets on restart — acceptable, low-frequency events)
 already_alerted = set()
