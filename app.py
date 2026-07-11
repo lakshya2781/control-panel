@@ -379,7 +379,7 @@ def run_alert_checks(service_statuses, live_data):
         for event in tel_json.get("security_events", []):
             alert_key = f"telecom_{event['source']}_{event['event_type']}_{event['time']}"
             if alert_key not in already_alerted:
-                subject = f"{'🔴' if event['severity'] == 'critical' else '⚡'} Telecom {event['severity'].upper()}: {event['event_type']}"
+                subject = f"{'🔴' if event['severity'] == 'critical' else '🟠' if event['severity'] == 'major' else '🟡'} Telecom {event['severity'].upper()}: {event['event_type']}"
                 send_alert_email(subject,
                     f"Detected at {now_ist()} IST.\n\n"
                     f"Source: {event['source'].upper()}\n"
@@ -520,23 +520,10 @@ def dashboard():
 
                 const tel = data.telecom_summary;
 
-const telHtml = tel
-    ? `
-        <div>
-            <p style="color:#aaa">Telecom Critical</p>
-            <h2 style="color:#ff3333">${tel.critical_events}</h2>
-        </div>
-        <div>
-            <p style="color:#aaa">Telecom Warnings</p>
-            <h2 style="color:#ffaa00">${tel.warning_events}</h2>
-        </div>
-      `
-    : `
-        <div>
-            <p style="color:#aaa">Telecom</p>
-            <h2 style="color:#555">N/A</h2>
-        </div>
-      `;
+                const telHtml = tel
+                     ? `<div><p style="color:#aaa">Telecom Critical</p><h2 style="color:#ff3333">${tel.critical_events}</h2></div>
+                        <div><p style="color:#aaa">Telecom Major</p><h2 style="color:#ff8800">${tel.major_events}</h2></div>
+                        <div><p style="color:#aaa">Telecom Minor</p><h2 style="color:#ffff00">${tel.minor_events}</h2></div>`
       
                 document.getElementById('data-panel').innerHTML = `
                     <div style="display:flex; gap:50px; margin:25px 0; flex-wrap:wrap;">
