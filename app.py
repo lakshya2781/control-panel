@@ -452,15 +452,15 @@ def dashboard_data():
             "error": str(e)
         })
         
-@app.route("/fix-notifications")
-def fix_notifications():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM notifications")
-    conn.commit()
-    cur.close()
-    conn.close()
-    return "Notifications cleared", 200
+#@app.route("/fix-notifications")
+ #def fix_notifications():
+    #conn = get_db()
+    #cur = conn.cursor()
+    #cur.execute("DELETE FROM notifications")
+    #conn.commit()
+    #cur.close()
+    #conn.close()
+    #return "Notifications cleared", 200
  
 @app.route("/")
 def dashboard():
