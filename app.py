@@ -123,6 +123,8 @@ def update_last_milestones(calls_milestone, sms_milestone):
     conn.close()
 
 def add_notification(message):
+    if "MINOR" in message.upper():
+        return  # skip minor alerts, don't store them
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
