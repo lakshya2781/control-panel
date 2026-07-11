@@ -427,7 +427,6 @@ def dashboard_data():
 
     try:
         live = get_live_data()
-        run_alert_checks(service_statuses, live)
         top_states = [{"name": name, "population": pop} for name, pop in live["top_states"]]
         return jsonify({
             "checked_at": now_ist(),
@@ -440,9 +439,9 @@ def dashboard_data():
             "top_gainer": live.get("top_gainer"),
             "top_loser": live.get("top_loser"),
             "stocks_last_updated": live.get("stocks_last_updated"),
-            "notifications": get_recent_notifications(),
             "telecom_summary": live.get("telecom_summary"),
             "telecom_security": live.get("telecom_security", []),
+            "notifications": get_recent_notifications(),
             "error": None
         })
     except Exception as e:
