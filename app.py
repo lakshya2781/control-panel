@@ -372,7 +372,7 @@ def run_alert_checks(service_statuses, live_data):
     except Exception as e:
         print(f"Stock check failed: {e}", flush=True)
 
-# --- Check 6: Telecom anomalies ---
+    # --- Check 6: Telecom anomalies ---
     try:
         tel_resp = requests.get(TELECOM_API_URL, timeout=5)
         tel_json = tel_resp.json()
@@ -520,10 +520,11 @@ def dashboard():
                 const tel = data.telecom_summary;
 
                 const telHtml = tel
-                     ? `<div><p style="color:#aaa">Telecom Critical</p><h2 style="color:#ff3333">${tel.critical_events}</h2></div>
-                        <div><p style="color:#aaa">Telecom Major</p><h2 style="color:#ff8800">${tel.major_events}</h2></div>
-                        <div><p style="color:#aaa">Telecom Minor</p><h2 style="color:#ffff00">${tel.minor_events}</h2></div>`
-      
+                    ? `<div><p style="color:#aaa">Telecom Critical</p><h2 style="color:#ff3333">${tel.critical_events}</h2></div>
+                       <div><p style="color:#aaa">Telecom Major</p><h2 style="color:#ff8800">${tel.major_events}</h2></div>
+                       <div><p style="color:#aaa">Telecom Minor</p><h2 style="color:#ffff00">${tel.minor_events}</h2></div>`
+                    : '';
+                    
                 document.getElementById('data-panel').innerHTML = `
                     <div style="display:flex; gap:50px; margin:25px 0; flex-wrap:wrap;">
                         <div><p style="color:#aaa">Counter Value</p><h2 style="color:lime">${data.counter_value}</h2></div>
