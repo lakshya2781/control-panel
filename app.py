@@ -375,7 +375,7 @@ def run_alert_checks(service_statuses, live_data):
         print(f"Stock check failed: {e}", flush=True)
 
     # --- Check 6: Telecom anomalies ---
-   try:
+    try:
         tel_resp = requests.get(TELECOM_API_URL, timeout=5)
         tel_json = tel_resp.json()
         for event in tel_json.get("security_events", []):
